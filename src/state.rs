@@ -58,7 +58,16 @@ fn init() -> ProgramState {
 
 	common::sequence::initialize(shared.vehicle_state.clone(), shared.mappings.clone());
 
-	let receiver = Receiver::new(&shared);
+	let receiver = loop {
+        match Receiver::new(&shared) {
+            Ok(initalized) => break initalized,
+            Err(error) => {
+                fail!("Error initializing receiver: {error}");
+            }
+        };
+    };
+
+    println!("Receiver successfully initialized!");
 
 	match receiver.receive_data() {
 		Ok(closure) => {
