@@ -2,6 +2,7 @@ mod forwarder;
 mod handler;
 mod state;
 mod switchboard;
+mod display;
 
 use std::sync::mpsc::Sender;
 

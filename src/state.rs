@@ -3,7 +3,7 @@ use jeflog::{task, pass, warn, fail};
 use postcard::experimental::max_size::MaxSize;
 use std::{fmt, io::{self, Read, Write}, net::{IpAddr, TcpStream, UdpSocket}, sync::{Arc, Mutex}, thread::{self, ThreadId}, time::Duration};
 use bimap::BiHashMap;
-use crate::{forwarder, handler::{self, create_device_handler}, switchboard, SERVO_PORT};
+use crate::{forwarder, display::display, handler::{self, create_device_handler}, switchboard, SERVO_PORT};
 use pyo3::Python;
 
 /// Holds all shared state that should be accessible concurrently in multiple contexts.
@@ -113,8 +113,9 @@ fn init() -> ProgramState {
 
 	sequence::initialize(shared.mappings.clone());
 	sequence::set_device_handler(create_device_handler(shared.clone(), command_tx));
-
 	thread::spawn(check_triggers(&shared));
+	let shared_clone = shared.clone(); 
+	thread::spawn(move || display(&shared_clone));
 
 	ProgramState::ServerDiscovery { shared }
 }
@@ -287,6 +288,7 @@ fn run_sequence(server_socket: TcpStream, sequence: Sequence, shared: SharedStat
 /// Constructs a closure which continuously checks if any triggers have tripped,
 /// running the corresponding script inline if so.
 fn check_triggers(shared: &SharedState) -> impl FnOnce() -> () {
+	print!("function called");
 	let triggers = shared.triggers.clone();
 
 	// return closure instead of using the function itself because of borrow-checking
@@ -329,3 +331,5 @@ fn check_triggers(shared: &SharedState) -> impl FnOnce() -> () {
 		}
 	}
 }
+
+
