@@ -288,7 +288,6 @@ fn run_sequence(server_socket: TcpStream, sequence: Sequence, shared: SharedStat
 /// Constructs a closure which continuously checks if any triggers have tripped,
 /// running the corresponding script inline if so.
 fn check_triggers(shared: &SharedState) -> impl FnOnce() -> () {
-	print!("function called");
 	let triggers = shared.triggers.clone();
 
 	// return closure instead of using the function itself because of borrow-checking

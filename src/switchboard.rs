@@ -134,7 +134,7 @@ fn listen(home_socket: UdpSocket, board_tx: Sender<Option<BoardCommunications>>)
 				}
 			};
 
-			task!("Interpreting buffer...");
+			//task!("Interpreting buffer...");
 			let raw_data = match postcard::from_bytes::<DataMessage>(&mut buf[..size]) {
 				Ok(data) => data,
 				Err(e) => {
@@ -142,9 +142,9 @@ fn listen(home_socket: UdpSocket, board_tx: Sender<Option<BoardCommunications>>)
 					continue;
 				}
 			};
-			pass!("Interpreted buffer.");
+			//pass!("Interpreted buffer.");
 
-			task!("Decoding buffer...");
+			//task!("Decoding buffer...");
 			board_tx.send(match raw_data {
 				DataMessage::Identity(board_id) => {
 					if established_sockets.contains(&incoming_address) {
@@ -172,7 +172,7 @@ fn listen(home_socket: UdpSocket, board_tx: Sender<Option<BoardCommunications>>)
 					Some(BoardCommunications::Init(board_id, incoming_address))
 				},
 				DataMessage::Sam(board_id, datapoints) => {
-					pass!("Received DataMessage::Sam from {board_id}");
+					//pass!("Received DataMessage::Sam from {board_id}");
 
 					Some(BoardCommunications::Sam(board_id, datapoints.to_vec()))
 				},
