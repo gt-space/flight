@@ -13,4 +13,5 @@ postcard = { version = "1.0.8", features = ["alloc"] }
 pyo3 = "0.20"
 ratatui = "0.26.1"
 sysinfo = "0.30.8"
+netraffic = "0.1.0"
 
