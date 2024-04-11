@@ -24,22 +24,21 @@ pub fn display(shared: &SharedState)-> io::Result<()> {
         stdout().execute(EnterAlternateScreen)?;
         let mut terminal = Terminal::new(CrosstermBackend::new(stdout()))?;
         let vehicle_state = shared.vehicle_state.lock().unwrap();
-        let sensor_data: &HashMap<String, Measurement> = &vehicle_state.sensor_readings;
-        let server_address = shared.server_address.lock().unwrap();
-        let server: Option<&IpAddr> = server_address.as_ref();
-        let mappings = shared.mappings.lock().unwrap();
-        let all_mappings :&Vec<NodeMapping> = &mappings;
-        terminal.draw(|mut frame| ui(&mut frame, sensor_data, server, all_mappings))?;
-
+        let sensor_data: HashMap<String, Measurement> = vehicle_state.sensor_readings.clone();
         drop(vehicle_state);
+        let server_address = shared.server_address.lock().unwrap();
+        let server: Option<IpAddr> = server_address.clone();
         drop(server_address);
+        let mappings = shared.mappings.lock().unwrap();
+        let all_mappings :Vec<NodeMapping> = mappings.clone();
         drop(mappings);
+        terminal.draw(|mut frame| ui(&mut frame, sensor_data, server, all_mappings))?;
 		thread::sleep(Duration::from_millis(100));
 
     }
 }
 
-fn ui(frame: &mut Frame, sensor_data: &HashMap<String, Measurement>, server: Option<&IpAddr>, mappings: &Vec<NodeMapping>) {
+fn ui(frame: &mut Frame, sensor_data: HashMap<String, Measurement>, server: Option<IpAddr>, mappings: Vec<NodeMapping>) {
     let num_measurements = sensor_data.len();
     let mut sensor_info = format!("Number of Measurements: {}\n\n", num_measurements);
     for (sensor_name, measurement) in sensor_data {
@@ -122,5 +121,4 @@ fn ui(frame: &mut Frame, sensor_data: &HashMap<String, Measurement>, server: Opt
     frame.render_widget(sam_box, sensor_and_sam_chunk[1]); 
  
 }
-
 
