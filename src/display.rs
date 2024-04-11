@@ -1,5 +1,5 @@
 use std::fmt::format;
-use std::{net::IpAddr, thread, time::Duration};
+use std::{net::IpAddr, thread, time::{Duration,Instant}};
 use std::io::{self, stdout};
 use std::{collections::HashMap};
 use std::ops::Div;
@@ -11,7 +11,7 @@ use crossterm::{
     terminal::{enable_raw_mode, EnterAlternateScreen, LeaveAlternateScreen},
     ExecutableCommand,
 };
-use sysinfo::{System};
+use sysinfo::{Networks, System};
 use hostname;
 use ratatui::{prelude::*, widgets::*};
 use netraffic::{Filter, Traffic};
@@ -43,38 +43,41 @@ fn ui(frame: &mut Frame, sensor_data: &HashMap<String, Measurement>, server: Opt
     let num_measurements = sensor_data.len();
     let mut sensor_info = format!("Number of Measurements: {}\n\n", num_measurements);
     for (sensor_name, measurement) in sensor_data {
-        sensor_info.push_str(&format!("{}: {:?}\n", sensor_name, measurement.value));
+        sensor_info.push_str(&format!("{}: {:?} {:?}\n", sensor_name, measurement.value, measurement.unit));
     }
     let sensor_box = Paragraph::new(sensor_info)
             .block(Block::default().title("Sensor Data").borders(Borders::ALL));
 
-    let system = System::new_all();
+    let mut system = System::new_all();
 
+    system.refresh_all();
     let cpu_usage = system
     .cpus()
     .iter()
     .fold(0.0, |util, cpu| util + cpu.cpu_usage())
     .div(system.cpus().len() as f32); 
+
     let memory_usage = system.used_memory() as f32 / system.total_memory() as f32 * 100.0;
+
     let hostname = hostname::get().unwrap_or_default().to_string_lossy().to_string();
 
-   /*  let mut traffic = Traffic::new();
-    let rule1 = "port 443";
-    let rule2 = "src host 127.0.0.1";
-    traffic.add_listener(Filter::new("eth0".to_string(), rule1.to_string()));
-    traffic.add_listener(Filter::new("eth0".to_string(), rule2.to_string()));
-    let data = traffic.get_data();
-    let data_rule1 = data.get(rule1);
-    let data_rule2 = data.get(rule2);
-    let network_info:String;
-    if let (Some(data_rule1), Some(data_rule2)) = (data_rule1, data_rule2) {
-        network_info = format!("rule1: {}, traffic: {} Bytes \n rule2: {}, traffic: {} Bytes", rule1, data_rule1.total,  rule2, data_rule2.total);
-    } else {
-        network_info = format!("No data available for rules");
-    } */
+    // Current implementation prints total data received and transmitted from all interfaces 
+    //prinint out current ammount / data transmitted since last iteration kept returning zero. 
+    let networks = Networks::new_with_refreshed_list();
+    let mut received: Option<u64> = None;
+    let mut transmitted: Option<u64> = None;
+    for (interface_name, data) in &networks {
+        received = Some(data.total_received());
+        transmitted = Some(data.total_transmitted());
+    }
+    let received_string = received.map(|val| val.to_string()).unwrap_or_else(|| "Could not be calculated".to_string());
+    let transmitted_string = transmitted.map(|val| val.to_string()).unwrap_or_else(|| "Could not be calculated".to_string());
 
     let system_box = Paragraph::new(format!("HostName: {}% \n CPU Usage: {}% \n Memory Usage: {}%", hostname, cpu_usage, memory_usage,))
     .block(Block::default().title("System Information").borders(Borders::ALL));
+
+    let network_box = Paragraph::new(format!("Received: {} B \n Transmitted: {} B", received_string, transmitted_string))
+    .block(Block::default().title("Network Usage").borders(Borders::ALL));
 
     let server_box = match server {
         Some(ip_addr) => Paragraph::new(format!("Connected To Server: {}", ip_addr)),
@@ -104,7 +107,7 @@ fn ui(frame: &mut Frame, sensor_data: &HashMap<String, Measurement>, server: Opt
 
     let system_and_server_chunk =  Layout::default()
     .direction(Direction::Vertical)
-    .constraints([Constraint::Percentage(50), Constraint::Percentage(50)].as_ref())
+    .constraints([Constraint::Percentage(33), Constraint::Percentage(33), Constraint::Percentage(33)].as_ref())
     .split(chunks[0]);
 
     let sensor_and_sam_chunk =  Layout::default()
@@ -113,7 +116,8 @@ fn ui(frame: &mut Frame, sensor_data: &HashMap<String, Measurement>, server: Opt
     .split(chunks[1]);
 
     frame.render_widget(system_box, system_and_server_chunk[0]);
-    frame.render_widget(server_box, system_and_server_chunk[1]);
+    frame.render_widget(server_box, system_and_server_chunk[2]);
+    frame.render_widget(network_box, system_and_server_chunk[1]);
     frame.render_widget(sensor_box, sensor_and_sam_chunk[0]); 
     frame.render_widget(sam_box, sensor_and_sam_chunk[1]); 
  
