@@ -19,6 +19,7 @@ use crate::state::SharedState;
 
 
 pub fn display(shared: &SharedState)-> io::Result<()> {
+    let mut network_data: (Option<u64>, Option<u64>) = (None, None);
     loop { 
         enable_raw_mode()?;
         stdout().execute(EnterAlternateScreen)?;
@@ -32,13 +33,15 @@ pub fn display(shared: &SharedState)-> io::Result<()> {
         let mappings = shared.mappings.lock().unwrap();
         let all_mappings :Vec<NodeMapping> = mappings.clone();
         drop(mappings);
-        terminal.draw(|mut frame| ui(&mut frame, sensor_data, server, all_mappings))?;
+        network_data = network_averager(network_data.0, network_data.1);
+
+        terminal.draw(|mut frame| ui(&mut frame, sensor_data, server, all_mappings, network_data.0, network_data.1))?;
 		thread::sleep(Duration::from_millis(100));
 
     }
 }
 
-fn ui(frame: &mut Frame, sensor_data: HashMap<String, Measurement>, server: Option<IpAddr>, mappings: Vec<NodeMapping>) {
+fn ui(frame: &mut Frame, sensor_data: HashMap<String, Measurement>, server: Option<IpAddr>, mappings: Vec<NodeMapping>, received: Option<u64>, transmitted: Option<u64>) {
     let num_measurements = sensor_data.len();
     let mut sensor_info = format!("Number of Measurements: {}\n\n", num_measurements);
     for (sensor_name, measurement) in sensor_data {
@@ -62,13 +65,8 @@ fn ui(frame: &mut Frame, sensor_data: HashMap<String, Measurement>, server: Opti
 
     // Current implementation prints total data received and transmitted from all interfaces 
     //prinint out current ammount / data transmitted since last iteration kept returning zero. 
-    let networks = Networks::new_with_refreshed_list();
-    let mut received: Option<u64> = None;
-    let mut transmitted: Option<u64> = None;
-    for (interface_name, data) in &networks {
-        received = Some(data.total_received());
-        transmitted = Some(data.total_transmitted());
-    }
+    
+
     let received_string = received.map(|val| val.to_string()).unwrap_or_else(|| "Could not be calculated".to_string());
     let transmitted_string = transmitted.map(|val| val.to_string()).unwrap_or_else(|| "Could not be calculated".to_string());
 
@@ -97,8 +95,6 @@ fn ui(frame: &mut Frame, sensor_data: HashMap<String, Measurement>, server: Opti
     }))
     .block(Block::default().title("Boards").borders(Borders::ALL)); 
 
-
-
     let chunks = Layout::default()
     .direction(Direction::Horizontal)
     .constraints([Constraint::Percentage(50), Constraint::Percentage(50)].as_ref())
@@ -122,3 +118,23 @@ fn ui(frame: &mut Frame, sensor_data: HashMap<String, Measurement>, server: Opti
  
 }
 
+fn network_averager(prev_received: Option<u64>, prev_transmitted: Option<u64>) -> (Option<u64>, Option<u64>) {
+    let networks = Networks::new_with_refreshed_list();
+    let mut received: u64 = 0;
+    let mut transmitted: u64 = 0;
+    for (interface_name, data) in &networks {
+        received += data.total_received();
+        transmitted += data.total_transmitted();
+    }
+    let received_average: Option<u64> = match (prev_received) {
+        Some(prev_received) => Some((prev_received + received) / 2), 
+        _ => Some(received), 
+    };
+    let transmitted_average: Option<u64> = match (prev_transmitted) {
+        Some(prev_transmitted) => Some((prev_transmitted + transmitted) / 2), 
+        _  => Some(transmitted), 
+    };
+
+
+    (received_average, transmitted_average) 
+}
