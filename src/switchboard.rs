@@ -29,16 +29,16 @@ fn start_switchboard(home_socket: UdpSocket, shared: SharedState, control_rx: Re
 	let mut timers: HashMap<BoardId, Option<Instant>> = HashMap::new();
 	let (board_tx, board_rx) = mpsc::channel::<Option<BoardCommunications>>();
 	
-	task!("Cloning sockets...");
+	//task!("Cloning sockets...");
 	let listen_socket = home_socket.try_clone()?;
 	let pulse_socket = home_socket.try_clone()?;
-	pass!("Sockets cloned!");
+	//pass!("Sockets cloned!");
 
 	thread::spawn(listen(listen_socket, board_tx));
 	thread::spawn(pulse(pulse_socket, sockets.clone(), &shared));
 
 	Ok(move || {
-		task!("Switchboard started.");
+		//task!("Switchboard started.");
     
 		loop {
 			// interpret data from SAM board
@@ -55,16 +55,16 @@ fn start_switchboard(home_socket: UdpSocket, shared: SharedState, control_rx: Re
 					if let Some(timer) = timers.get_mut(&board_id) {
 						*timer = Some(Instant::now());
 					} else {
-						warn!("Cannot find timer for board with id of {board_id}!");
+						//warn!("Cannot find timer for board with id of {board_id}!");
 					}
 				},
 				Ok(Some(BoardCommunications::Bsm(board_id))) => {
-					warn!("Recieved BSM data from board {board_id}"); 
+					//warn!("Recieved BSM data from board {board_id}"); 
 
 					if let Some(timer) = timers.get_mut(&board_id) {
 						*timer = Some(Instant::now());
 					} else {
-						warn!("Cannot find timer for board with id of {board_id}!");
+						//warn!("Cannot find timer for board with id of {board_id}!");
 					}
 				},
 				Ok(None) => { warn!("Unknown data recieved from board!"); },
@@ -80,7 +80,7 @@ fn start_switchboard(home_socket: UdpSocket, shared: SharedState, control_rx: Re
 					let control_message = match postcard::to_slice(&control_message, &mut buf) {
 						Ok(package) =>  package,
 						Err(e) => {
-							fail!("postcard returned this error when attempting to serialize control message {:#?}: {e}", control_message);
+							//fail!("postcard returned this error when attempting to serialize control message {:#?}: {e}", control_message);
 							break 'b;
 						}
 					};
@@ -89,12 +89,12 @@ fn start_switchboard(home_socket: UdpSocket, shared: SharedState, control_rx: Re
 					if let Some(socket) = sockets.get(&board_id) {
 						let socket = (socket.ip(), 8378);
 
-						match home_socket.send_to(control_message, socket) {
+						/*match home_socket.send_to(control_message, socket) {
 							Ok(size) => pass!("Sent {size} bits of control message successfully!"),
 							Err(e) => fail!("Couldn't send control message to board {board_id} via socket {:#?}: {e}", socket),
-						};
+						}; */
 					} else {
-						fail!("Couldn't find socket with board ID {board_id} in sockets HashMap.");
+						//fail!("Couldn't find socket with board ID {board_id} in sockets HashMap.");
 					}
 				},
 				Err(TryRecvError::Disconnected) => { warn!("Lost connection to control_tx channel. This isn't supposed to happen."); },
@@ -107,7 +107,7 @@ fn start_switchboard(home_socket: UdpSocket, shared: SharedState, control_rx: Re
 			for (board_id, timer) in timers.iter_mut() {
 				if let Some(raw_time) = timer {
 					if Instant::now() - *raw_time > HEARTBEAT_INTERVAL {
-						fail!("{}", format!("{board_id} is unresponsive. Aborting..."));
+						//fail!("{}", format!("{board_id} is unresponsive. Aborting..."));
 						abort(&shared);
 						*timer = None;
 					}
@@ -129,7 +129,7 @@ fn listen(home_socket: UdpSocket, board_tx: Sender<Option<BoardCommunications>>)
 			let (size, incoming_address) = match home_socket.recv_from(&mut buf) {
 				Ok(tuple) => tuple,
 				Err(e) => {
-					warn!("Error in receiving data from home_socket: {e}");
+					//warn!("Error in receiving data from home_socket: {e}");
 					continue;
 				}
 			};
@@ -138,7 +138,7 @@ fn listen(home_socket: UdpSocket, board_tx: Sender<Option<BoardCommunications>>)
 			let raw_data = match postcard::from_bytes::<DataMessage>(&mut buf[..size]) {
 				Ok(data) => data,
 				Err(e) => {
-					fail!("postcard couldn't interpret the datagram: {e}");
+					//fail!("postcard couldn't interpret the datagram: {e}");
 					continue;
 				}
 			};
@@ -148,7 +148,7 @@ fn listen(home_socket: UdpSocket, board_tx: Sender<Option<BoardCommunications>>)
 			board_tx.send(match raw_data {
 				DataMessage::Identity(board_id) => {
 					if established_sockets.contains(&incoming_address) {
-						warn!("{board_id} sent an Identity after it already was sent one.");
+						//warn!("{board_id} sent an Identity after it already was sent one.");
 					} else {
 						established_sockets.insert(incoming_address);
 					}
@@ -158,15 +158,15 @@ fn listen(home_socket: UdpSocket, board_tx: Sender<Option<BoardCommunications>>)
 					let package = match postcard::to_slice(&value, &mut buf) {
 						Ok(package) => package,
 						Err(e) => {
-							warn!("postcard returned this error when attempting to serialize DataMessage::Identity: {e}");
+							//warn!("postcard returned this error when attempting to serialize DataMessage::Identity: {e}");
 							continue;
 						}
 					};
 
 					if let Err(e) = home_socket.send_to(package, incoming_address) {
-						fail!("Couldn't send DataMessage::Identity to ip {incoming_address}: {e}");
+						//fail!("Couldn't send DataMessage::Identity to ip {incoming_address}: {e}");
 					} else {
-						pass!("Sent DataMessage::Identity successfully.");
+						//pass!("Sent DataMessage::Identity successfully.");
 					}
 
 					Some(BoardCommunications::Init(board_id, incoming_address))
@@ -177,12 +177,12 @@ fn listen(home_socket: UdpSocket, board_tx: Sender<Option<BoardCommunications>>)
 					Some(BoardCommunications::Sam(board_id, datapoints.to_vec()))
 				},
 				DataMessage::Bms(board_id) => {
-					pass!("Received DataMessage::Bms from {board_id}");
+					//pass!("Received DataMessage::Bms from {board_id}");
 
 					Some(BoardCommunications::Bsm(board_id))
 				},
 				_ => {
-					warn!("Unknown data found.");
+					//warn!("Unknown data found.");
 
 					None
 				}
@@ -202,7 +202,7 @@ fn pulse(socket: UdpSocket, sockets: Arc<Mutex<HashMap<BoardId, SocketAddr>>>, s
 		let heartbeat = match postcard::to_slice(&DataMessage::FlightHeartbeat, &mut buf) {
 			Ok(package) => package,
 			Err(e) => {
-				fail!("postcard returned this error when attempting to serialize DataMessage::FlightHeartbeat: {e}");
+				//fail!("postcard returned this error when attempting to serialize DataMessage::FlightHeartbeat: {e}");
 				abort(&shared);
 				return;
 			}
@@ -213,7 +213,7 @@ fn pulse(socket: UdpSocket, sockets: Arc<Mutex<HashMap<BoardId, SocketAddr>>>, s
 				let sockets = sockets.lock().unwrap();
 				for address in sockets.iter() {
 					if let Err(e) = socket.send_to(heartbeat, address.1) {
-						fail!("Couldn't send heartbeat to socket {socket:#?}: {e}");
+						//fail!("Couldn't send heartbeat to socket {socket:#?}: {e}");
 						abort(&shared);
 					}
 				}
@@ -228,7 +228,7 @@ fn abort(shared: &SharedState) {
 	let sequences = shared.sequences.lock().unwrap();
 
 	if sequences.is_empty() {
-		fail!("No sequence to abort!");
+		//fail!("No sequence to abort!");
 		return;
 	}
 

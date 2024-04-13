@@ -80,7 +80,7 @@ fn actuate_valve(name: &str, state: ValveState, mappings: &Mutex<Vec<NodeMapping
 	let mappings = mappings.lock().unwrap();
 
 	let Some(mapping) = mappings.iter().find(|m| m.text_id == name) else {
-		fail!("Failed to actuate valve: mapping '{name}' is not defined.");
+		//fail!("Failed to actuate valve: mapping '{name}' is not defined.");
 		return;
 	};
 
@@ -90,11 +90,11 @@ fn actuate_valve(name: &str, state: ValveState, mappings: &Mutex<Vec<NodeMapping
 
 	let message = SamControlMessage::ActuateValve { channel: mapping.channel, powered };
 
-	task!("Sending SamControlMessage::ActuateValve to {}", mapping.board_id);
-	match command_tx.send((mapping.board_id.clone(), message)) {
-		Ok(()) => pass!("Command sent!"),
-		Err(e) => fail!("Command couldn't be sent: {e}")
-	}
+	//task!("Sending SamControlMessage::ActuateValve to {}", mapping.board_id);
+	//match command_tx.send((mapping.board_id.clone(), message)) {
+		//Ok(()) => pass!("Command sent!"),
+		//Err(e) => fail!("Command couldn't be sent: {e}")
+	//}
 
 	drop(mappings);
 	let mut vehicle_state = vehicle_state.lock().unwrap();
@@ -116,7 +116,7 @@ pub fn abort(shared: &SharedState) {
 		.clone();
 
 	let Some(sequence) = abort_sequence else {
-		warn!("Abort was called but no abort sequence is set.");
+		//warn!("Abort was called but no abort sequence is set.");
 		return;
 	};
 

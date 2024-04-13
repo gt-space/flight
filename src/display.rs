@@ -119,22 +119,27 @@ fn ui(frame: &mut Frame, sensor_data: HashMap<String, Measurement>, server: Opti
 }
 
 fn network_averager(prev_received: Option<u64>, prev_transmitted: Option<u64>) -> (Option<u64>, Option<u64>) {
-    let networks = Networks::new_with_refreshed_list();
+    let mut networks = Networks::new_with_refreshed_list();
     let mut received: u64 = 0;
     let mut transmitted: u64 = 0;
+    
     for (interface_name, data) in &networks {
         received += data.total_received();
         transmitted += data.total_transmitted();
     }
+
     let received_average: Option<u64> = match (prev_received) {
         Some(prev_received) => Some((prev_received + received) / 2), 
         _ => Some(received), 
     };
+
     let transmitted_average: Option<u64> = match (prev_transmitted) {
         Some(prev_transmitted) => Some((prev_transmitted + transmitted) / 2), 
         _  => Some(transmitted), 
     };
 
+    networks.refresh();
 
     (received_average, transmitted_average) 
+
 }

@@ -20,11 +20,11 @@ pub fn forward_vehicle_state(shared: &SharedState) -> impl Fn() -> () {
 						let result = socket.send_to(&serialized, (server_address, 7201));
 
 						if result.is_err() {
-							fail!("Failed to send vehicle state update to server at \x1b[1m{server_address}:7201\x1b[0m.");
+							//fail!("Failed to send vehicle state update to server at \x1b[1m{server_address}:7201\x1b[0m.");
 						}
 					},
 					Err(error) => {
-						fail!("Failed to serialize vehicle state with Postcard: {}.", error.to_string());
+						//fail!("Failed to serialize vehicle state with Postcard: {}.", error.to_string());
 					}
 				}
 			}

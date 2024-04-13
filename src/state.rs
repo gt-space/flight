@@ -106,7 +106,7 @@ fn init() -> ProgramState {
 		match switchboard::run(home_socket, shared.clone()) {
 			Ok(command_tx) => command_tx,
 			Err(error) => {
-				fail!("Failed to create switchboard: {error}");
+				//fail!("Failed to create switchboard: {error}");
 				return ProgramState::Init;
 			}
 	};
@@ -121,20 +121,20 @@ fn init() -> ProgramState {
 }
 
 fn server_discovery(shared: SharedState) -> ProgramState {
-	task!("Locating control server.");
+	//task!("Locating control server.");
 
 	let potential_hostnames = ["server-01.local", "server-02.local", "localhost"];
 
 	for host in potential_hostnames {
-		task!("Attempting to connect to \x1b[1m{}:{SERVO_PORT}\x1b[0m.", host);
+		//task!("Attempting to connect to \x1b[1m{}:{SERVO_PORT}\x1b[0m.", host);
 
 		let Ok(mut stream) = TcpStream::connect((host, SERVO_PORT)) else {
 			fail!("Failed to connect to \x1b[1m{}:{SERVO_PORT}\x1b[0m.", host);
 			continue;
 		};
 
-		pass!("Successfully connected to \x1b[1m{}:{SERVO_PORT}\x1b[0m.", host);
-		pass!("Found control server at \x1b[1m{}:{SERVO_PORT}\x1b[0m.", host);
+		//pass!("Successfully connected to \x1b[1m{}:{SERVO_PORT}\x1b[0m.", host);
+		//pass!("Found control server at \x1b[1m{}:{SERVO_PORT}\x1b[0m.", host);
 
 		let hostname = hostname::get()
 			.ok()
@@ -148,11 +148,11 @@ fn server_discovery(shared: SharedState) -> ProgramState {
 			} else if hostname.starts_with("ground") {
 				computer = Computer::Ground;
 			} else {
-				warn!("Local hostname does not start with 'flight' or 'ground'. Defaulting to flight.");
+				//warn!("Local hostname does not start with 'flight' or 'ground'. Defaulting to flight.");
 				computer = Computer::Flight;
 			}
 		} else {
-			warn!("Failed to get local hostname. Defaulting to flight.");
+			//warn!("Failed to get local hostname. Defaulting to flight.");
 			computer = Computer::Flight;
 		}
 
@@ -160,12 +160,12 @@ fn server_discovery(shared: SharedState) -> ProgramState {
 		let mut identity = [0; Computer::POSTCARD_MAX_SIZE];
 
 		if let Err(error) = postcard::to_slice(&computer, &mut identity) {
-			fail!("Failed to serialize Computer: {error}");
+			//fail!("Failed to serialize Computer: {error}");
 			continue;
 		}
 
 		if let Err(error) = stream.write_all(&identity) {
-			warn!("Failed to send identity message to control server: {error}");
+			//warn!("Failed to send identity message to control server: {error}");
 			continue;
 		}
 
@@ -175,7 +175,7 @@ fn server_discovery(shared: SharedState) -> ProgramState {
 		return ProgramState::WaitForOperator { server_socket: stream, shared };
 	}
 
-	fail!("Failed to locate control server at all potential hostnames. Retrying.");
+	//fail!("Failed to locate control server at all potential hostnames. Retrying.");
 	ProgramState::ServerDiscovery { shared }
 }
 
@@ -193,12 +193,12 @@ fn wait_for_operator(mut server_socket: TcpStream, shared: SharedState) -> Progr
 				Ok(message) => {
 					match message {
 						FlightControlMessage::Mappings(mappings) => {
-							pass!("Received mappings from server: {mappings:#?}");
+							//pass!("Received mappings from server: {mappings:#?}");
 							*shared.mappings.lock().unwrap() = mappings;
 							ProgramState::WaitForOperator { server_socket, shared }
 						},
 						FlightControlMessage::Sequence(sequence) => {
-							pass!("Received sequence from server: {sequence:#?}");
+							//pass!("Received sequence from server: {sequence:#?}");
 
 							// if the abort sequence was set, don't run it
 							// set the shared abort sequence and return early
@@ -210,7 +210,7 @@ fn wait_for_operator(mut server_socket: TcpStream, shared: SharedState) -> Progr
 							ProgramState::RunSequence { server_socket, sequence, shared }
 						},
 						FlightControlMessage::Trigger(trigger) => {
-							pass!("Received trigger from server: {trigger:#?}");
+							//pass!("Received trigger from server: {trigger:#?}");
 							
 							// update existing trigger if one has the same name
 							// otherwise, add a new trigger to the vec
@@ -232,29 +232,29 @@ fn wait_for_operator(mut server_socket: TcpStream, shared: SharedState) -> Progr
 							ProgramState::WaitForOperator { server_socket, shared }
 						},
 						FlightControlMessage::StopSequence(name) => {
-							pass!("Received instruction to stop sequence from server.");
+							//pass!("Received instruction to stop sequence from server.");
 							let stopped = shared.sequences
 								.lock()
 								.unwrap()
 								.remove_by_left(&name);
 
 							if stopped.is_some() {
-								pass!("Stopped sequence '{name}'.");
+								//pass!("Stopped sequence '{name}'.");
 							} else {
-								warn!("Sequence '{name}' was not running.");
+								//warn!("Sequence '{name}' was not running.");
 							}
 
 							ProgramState::WaitForOperator { server_socket, shared }
 						},
 						FlightControlMessage::Abort => {
-							pass!("Received abort instruction from server.");
+							//pass!("Received abort instruction from server.");
 							handler::abort(&shared);
 							ProgramState::WaitForOperator { server_socket, shared }
 						}
 					}
 				},
 				Err(error) => {
-					warn!("Failed to deserialize control message: {}.", error.to_string());
+					//warn!("Failed to deserialize control message: {}.", error.to_string());
 					ProgramState::WaitForOperator { server_socket, shared }
 				}
 			}
@@ -263,7 +263,7 @@ fn wait_for_operator(mut server_socket: TcpStream, shared: SharedState) -> Progr
 			ProgramState::WaitForOperator { server_socket, shared }
 		},
 		Err(error) => {
-			fail!("Failed to read from server socket: {}. Dropping connection.", error.to_string());
+			//fail!("Failed to read from server socket: {}. Dropping connection.", error.to_string());
 			ProgramState::ServerDiscovery { shared }
 		}
 	}
@@ -319,7 +319,7 @@ fn check_triggers(shared: &SharedState) -> impl FnOnce() -> () {
 				}
 
 				if let Err(error) = check {
-					fail!("Trigger '{}' raised exception during execution: {error}", trigger.name);
+					//fail!("Trigger '{}' raised exception during execution: {error}", trigger.name);
 					trigger.active = false;
 				}
 			}

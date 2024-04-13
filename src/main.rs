@@ -17,7 +17,7 @@ fn main() {
 	let mut state = ProgramState::Init;
 
 	loop {
-		pass!("Transitioned to state: {state}");
+		//pass!("Transitioned to state: {state}");
 		state = state.next();
 	}
 }
