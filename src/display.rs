@@ -20,7 +20,7 @@ use crate::state::SharedState;
 
 pub fn display(shared: &SharedState)-> io::Result<()> {
     let mut network_data: (Option<u64>, Option<u64>) = (None, None);
-    enable_raw_mode()?;
+    //enable_raw_mode()?;
     stdout().execute(EnterAlternateScreen)?;
     let mut terminal = Terminal::new(CrosstermBackend::new(stdout()))?;
     loop { 
