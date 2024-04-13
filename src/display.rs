@@ -20,10 +20,10 @@ use crate::state::SharedState;
 
 pub fn display(shared: &SharedState)-> io::Result<()> {
     let mut network_data: (Option<u64>, Option<u64>) = (None, None);
+    enable_raw_mode()?;
+    stdout().execute(EnterAlternateScreen)?;
+    let mut terminal = Terminal::new(CrosstermBackend::new(stdout()))?;
     loop { 
-        enable_raw_mode()?;
-        stdout().execute(EnterAlternateScreen)?;
-        let mut terminal = Terminal::new(CrosstermBackend::new(stdout()))?;
         let vehicle_state = shared.vehicle_state.lock().unwrap();
         let sensor_data: HashMap<String, Measurement> = vehicle_state.sensor_readings.clone();
         drop(vehicle_state);
@@ -122,7 +122,7 @@ fn network_averager(prev_received: Option<u64>, prev_transmitted: Option<u64>) -
     let mut networks = Networks::new_with_refreshed_list();
     let mut received: u64 = 0;
     let mut transmitted: u64 = 0;
-    
+
     for (interface_name, data) in &networks {
         received += data.total_received();
         transmitted += data.total_transmitted();

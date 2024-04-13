@@ -319,7 +319,7 @@ fn process_sam_data(vehicle_state: Arc<Mutex<VehicleState>>, mappings: Arc<Mutex
 							text_id = format!("{text_id}_I");
 						},
 						channel_type => {
-							warn!("Measured channel type of '{channel_type:?}' for valve.");
+							//warn!("Measured channel type of '{channel_type:?}' for valve.");
 							continue;
 						},
 					};

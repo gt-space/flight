@@ -129,7 +129,7 @@ fn server_discovery(shared: SharedState) -> ProgramState {
 		//task!("Attempting to connect to \x1b[1m{}:{SERVO_PORT}\x1b[0m.", host);
 
 		let Ok(mut stream) = TcpStream::connect((host, SERVO_PORT)) else {
-			fail!("Failed to connect to \x1b[1m{}:{SERVO_PORT}\x1b[0m.", host);
+			//fail!("Failed to connect to \x1b[1m{}:{SERVO_PORT}\x1b[0m.", host);
 			continue;
 		};
 
