@@ -1,5 +1,4 @@
 use crate::state::SharedState;
-use jeflog::fail;
 use std::{net::UdpSocket, thread, time::Duration};
 
 pub fn forward_vehicle_state(shared: &SharedState) -> impl Fn() -> () {
@@ -23,7 +22,7 @@ pub fn forward_vehicle_state(shared: &SharedState) -> impl Fn() -> () {
 							//fail!("Failed to send vehicle state update to server at \x1b[1m{server_address}:7201\x1b[0m.");
 						}
 					},
-					Err(error) => {
+					Err(_) => {
 						//fail!("Failed to serialize vehicle state with Postcard: {}.", error.to_string());
 					}
 				}

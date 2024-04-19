@@ -1,5 +1,5 @@
 use common::{comm::{BoardId, CompositeValveState, NodeMapping, SamControlMessage, ValveState, VehicleState}, sequence::{self, AbortError, DeviceAction}};
-use jeflog::{fail, warn};
+use jeflog::fail;
 use pyo3::{types::PyNone, IntoPy, PyErr, PyObject, Python, ToPyObject};
 use std::{sync::{mpsc::Sender, Mutex}, thread};
 

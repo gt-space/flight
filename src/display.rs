@@ -1,20 +1,13 @@
-use std::fmt::format;
 use std::{net::IpAddr, thread, time::{Duration,Instant}};
 use std::io::{self, stdout};
 use std::collections::HashMap;
 use std::ops::Div;
 use common::comm::Measurement;
 use common::comm::NodeMapping;
-use crossterm::{
-    event::{self, Event, KeyCode},
-    terminal::{enable_raw_mode, disable_raw_mode, EnterAlternateScreen, LeaveAlternateScreen},
-    ExecutableCommand,
-    execute
-};
+use crossterm::{terminal::EnterAlternateScreen, ExecutableCommand};
 use sysinfo::{Networks, System};
 use hostname;
 use ratatui::{prelude::*, widgets::*};
-use netraffic::{Filter, Traffic};
 use crate::state::SharedState;
 
 
@@ -121,13 +114,13 @@ fn network_averager(prev_received: Option<u64>, prev_transmitted: Option<u64>, p
     let mut received: u64 = 0;
     let mut transmitted: u64 = 0;
 
-    for (interface_name, data) in &networks {
+    for (_, data) in &networks {
         received += data.received();
         transmitted += data.transmitted();
     }
     //over the last second or 5 seconds, how much data was retreived kilobytes / second
     let time_now = Instant::now();
-    let time_passed: Option<Duration> =  match (prev_time) {
+    let time_passed: Option<Duration> =  match prev_time {
         Some(prev_time) => Some(time_now.duration_since(prev_time)),
         _ => None, 
         };
@@ -144,15 +137,11 @@ fn network_averager(prev_received: Option<u64>, prev_transmitted: Option<u64>, p
             let time_passed2 = time_now2.duration_since(time_now);
             let time_passed_float = time_passed2.as_secs_f64();
             let received_float = received as f64;
-            let average_float = (received_float / time_passed_float);
+            let average_float = received_float / time_passed_float;
             Some(average_float.ceil() as u64)
         }
     };
 
-    let transmitted_average: Option<u64> = match (prev_transmitted) {
-        Some(prev_transmitted) => Some((prev_transmitted + transmitted) / 2), 
-        _  => Some(transmitted), 
-    };
     let transmitted_average: Option<u64> = match (prev_transmitted, time_passed) {
         (Some(prev_transmitted), Some(time_passed)) => {
             let prev_transmitted_float = prev_transmitted as f64;
@@ -166,7 +155,7 @@ fn network_averager(prev_received: Option<u64>, prev_transmitted: Option<u64>, p
             let time_passed2 = time_now2.duration_since(time_now);
             let time_passed_float = time_passed2.as_secs_f64();
             let transmitted_float = transmitted as f64;
-            let average_float = (transmitted_float / time_passed_float);
+            let average_float = transmitted_float / time_passed_float;
             Some(average_float.ceil() as u64)
         }
     };

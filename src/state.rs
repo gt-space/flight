@@ -1,9 +1,8 @@
 use common::{comm::{Computer, FlightControlMessage, NodeMapping, Sequence, VehicleState}, sequence};
-use jeflog::{task, pass, warn, fail};
 use postcard::experimental::max_size::MaxSize;
 use std::{fmt, io::{self, Read, Write}, net::{IpAddr, TcpStream, UdpSocket}, sync::{Arc, Mutex}, thread::{self, ThreadId}, time::Duration};
 use bimap::BiHashMap;
-use crate::{forwarder, handler::{self, create_device_handler}, switchboard, SWITCHBOARD_ADDRESS, SERVO_PORT};
+use crate::{forwarder, display::display, handler::{self, create_device_handler}, switchboard, SWITCHBOARD_ADDRESS, SERVO_PORT};
 use pyo3::Python;
 
 /// Holds all shared state that should be accessible concurrently in multiple contexts.
