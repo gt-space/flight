@@ -1,15 +1,15 @@
 use std::fmt::format;
 use std::{net::IpAddr, thread, time::{Duration,Instant}};
 use std::io::{self, stdout};
-use std::{collections::HashMap};
+use std::collections::HashMap;
 use std::ops::Div;
 use common::comm::Measurement;
 use common::comm::NodeMapping;
-use jeflog::pass;
 use crossterm::{
     event::{self, Event, KeyCode},
-    terminal::{enable_raw_mode, EnterAlternateScreen, LeaveAlternateScreen},
+    terminal::{enable_raw_mode, disable_raw_mode, EnterAlternateScreen, LeaveAlternateScreen},
     ExecutableCommand,
+    execute
 };
 use sysinfo::{Networks, System};
 use hostname;
@@ -19,8 +19,7 @@ use crate::state::SharedState;
 
 
 pub fn display(shared: &SharedState)-> io::Result<()> {
-    let mut network_data: (Option<u64>, Option<u64>) = (None, None);
-    //enable_raw_mode()?;
+    let mut network_data: (Option<u64>, Option<u64>, Option<Instant>) = (None, None, None);
     stdout().execute(EnterAlternateScreen)?;
     let mut terminal = Terminal::new(CrosstermBackend::new(stdout()))?;
     loop { 
@@ -33,11 +32,10 @@ pub fn display(shared: &SharedState)-> io::Result<()> {
         let mappings = shared.mappings.lock().unwrap();
         let all_mappings :Vec<NodeMapping> = mappings.clone();
         drop(mappings);
-        network_data = network_averager(network_data.0, network_data.1);
+        network_data = network_averager(network_data.0, network_data.1,network_data.2);
 
         terminal.draw(|mut frame| ui(&mut frame, sensor_data, server, all_mappings, network_data.0, network_data.1))?;
 		thread::sleep(Duration::from_millis(100));
-
     }
 }
 
@@ -73,7 +71,7 @@ fn ui(frame: &mut Frame, sensor_data: HashMap<String, Measurement>, server: Opti
     let system_box = Paragraph::new(format!("HostName: {}% \n CPU Usage: {}% \n Memory Usage: {}%", hostname, cpu_usage, memory_usage,))
     .block(Block::default().title("System Information").borders(Borders::ALL));
 
-    let network_box = Paragraph::new(format!("Received: {} B \n Transmitted: {} B", received_string, transmitted_string))
+    let network_box = Paragraph::new(format!("Received: {} B/s \n Transmitted: {} B/s", received_string, transmitted_string))
     .block(Block::default().title("Network Usage").borders(Borders::ALL));
 
     let server_box = match server {
@@ -118,28 +116,66 @@ fn ui(frame: &mut Frame, sensor_data: HashMap<String, Measurement>, server: Opti
  
 }
 
-fn network_averager(prev_received: Option<u64>, prev_transmitted: Option<u64>) -> (Option<u64>, Option<u64>) {
+fn network_averager(prev_received: Option<u64>, prev_transmitted: Option<u64>, prev_time: Option<Instant>) -> (Option<u64>, Option<u64>, Option<Instant>) {
     let mut networks = Networks::new_with_refreshed_list();
     let mut received: u64 = 0;
     let mut transmitted: u64 = 0;
 
     for (interface_name, data) in &networks {
-        received += data.total_received();
-        transmitted += data.total_transmitted();
+        received += data.received();
+        transmitted += data.transmitted();
     }
-
-    let received_average: Option<u64> = match (prev_received) {
-        Some(prev_received) => Some((prev_received + received) / 2), 
-        _ => Some(received), 
+    //over the last second or 5 seconds, how much data was retreived kilobytes / second
+    let time_now = Instant::now();
+    let time_passed: Option<Duration> =  match (prev_time) {
+        Some(prev_time) => Some(time_now.duration_since(prev_time)),
+        _ => None, 
+        };
+    let received_average: Option<u64> = match (prev_received, time_passed) {
+        (Some(prev_received), Some(time_passed)) => {
+            let prev_received_float = prev_received as f64;
+            let received_float = received as f64;
+            let time_passed_float = time_passed.as_secs_f64();
+            let average_float = (prev_received_float * 0.98) + ((received_float / time_passed_float) * 0.02);
+            Some(average_float.ceil() as u64)
+        }        
+        _ => {
+            let time_now2 = Instant::now();
+            let time_passed2 = time_now2.duration_since(time_now);
+            let time_passed_float = time_passed2.as_secs_f64();
+            let received_float = received as f64;
+            let average_float = (received_float / time_passed_float);
+            Some(average_float.ceil() as u64)
+        }
     };
 
     let transmitted_average: Option<u64> = match (prev_transmitted) {
         Some(prev_transmitted) => Some((prev_transmitted + transmitted) / 2), 
         _  => Some(transmitted), 
     };
+    let transmitted_average: Option<u64> = match (prev_transmitted, time_passed) {
+        (Some(prev_transmitted), Some(time_passed)) => {
+            let prev_transmitted_float = prev_transmitted as f64;
+            let transmitted_float = transmitted as f64;
+            let time_passed_float = time_passed.as_secs_f64();
+            let average_float = (prev_transmitted_float * 0.98) + ((transmitted_float / time_passed_float) * 0.02);
+            Some(average_float.ceil() as u64)
+        }        
+        _ => {
+            let time_now2 = Instant::now();
+            let time_passed2 = time_now2.duration_since(time_now);
+            let time_passed_float = time_passed2.as_secs_f64();
+            let transmitted_float = transmitted as f64;
+            let average_float = (transmitted_float / time_passed_float);
+            Some(average_float.ceil() as u64)
+        }
+    };
 
     networks.refresh();
+    let last_refresh_time = Some(Instant::now());
 
-    (received_average, transmitted_average) 
+
+
+    (received_average, transmitted_average, last_refresh_time) 
 
 }

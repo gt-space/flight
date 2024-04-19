@@ -67,8 +67,8 @@ fn start_switchboard(home_socket: UdpSocket, shared: SharedState, control_rx: Re
 						//warn!("Cannot find timer for board with id of {board_id}!");
 					}
 				},
-				Ok(None) => { warn!("Unknown data recieved from board!"); },
-				Err(TryRecvError::Disconnected) => { warn!("Lost connection to board_tx channel. This isn't supposed to happen."); },
+				Ok(None) => { /*warn!("Unknown data recieved from board!"); */},
+				Err(TryRecvError::Disconnected) => { /*warn!("Lost connection to board_tx channel. This isn't supposed to happen.");*/ },
 				Err(TryRecvError::Empty) => {}
 			};
 
@@ -97,7 +97,7 @@ fn start_switchboard(home_socket: UdpSocket, shared: SharedState, control_rx: Re
 						//fail!("Couldn't find socket with board ID {board_id} in sockets HashMap.");
 					}
 				},
-				Err(TryRecvError::Disconnected) => { warn!("Lost connection to control_tx channel. This isn't supposed to happen."); },
+				Err(TryRecvError::Disconnected) => { /*warn!("Lost connection to control_tx channel. This isn't supposed to happen."); */},
 				Err(TryRecvError::Empty) => {}
 			};
 			
@@ -124,7 +124,7 @@ fn listen(home_socket: UdpSocket, board_tx: Sender<Option<BoardCommunications>>)
 		
 		let mut established_sockets = HashSet::new();
 
-		task!("Flight Computer listening for SAM data...");
+		//task!("Flight Computer listening for SAM data...");
 		loop {
 			let (size, incoming_address) = match home_socket.recv_from(&mut buf) {
 				Ok(tuple) => tuple,
@@ -186,7 +186,7 @@ fn listen(home_socket: UdpSocket, board_tx: Sender<Option<BoardCommunications>>)
 
 					None
 				}
-			}).expect("board_rx closed unexpectedly. This shouldn't happen.");	
+			})/* .expect("board_rx closed unexpectedly. This shouldn't happen.")*/;	
 		}
 	}
 }

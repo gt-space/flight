@@ -7,7 +7,7 @@ pub fn forward_vehicle_state(shared: &SharedState) -> impl Fn() -> () {
 	let vehicle_state = shared.vehicle_state.clone();
 
 	let socket = UdpSocket::bind("0.0.0.0:0")
-		.expect("failed to bind to UDP socket");
+		 .expect("failed to bind to UDP socket");
 
 	move || {
 		loop {
