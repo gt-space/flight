@@ -10,7 +10,7 @@ pub fn worker(shared: SharedState, gig: Receiver<(BoardId, Vec<DataPoint>)>) -> 
       process_sam_data(shared.vehicle_state.clone(), shared.mappings.clone(), board_id, datapoints)
     }
 
-    fail!("Switchboard has unexpectedly closed the gig channel. Aborting and committing suicide...");
+    //fail!("Switchboard has unexpectedly closed the gig channel. Aborting and committing suicide...");
     handler::abort(&shared);
   }
 }
@@ -99,7 +99,7 @@ fn process_sam_data(vehicle_state: Arc<Mutex<VehicleState>>, mappings: Arc<Mutex
 							text_id = format!("{text_id}_I");
 						},
 						channel_type => {
-							warn!("Measured channel type of '{channel_type:?}' for valve.");
+							//warn!("Measured channel type of '{channel_type:?}' for valve.");
 							continue;
 						},
 					};

@@ -4,7 +4,7 @@ mod state;
 mod switchboard;
 mod display;
 
-use std::{sync::mpsc::{Receiver, Sender}, time::Duration};
+use std::{sync::mpsc::{Receiver, Sender}, time::{Duration, Instant}};
 
 use common::comm::{BoardId, SamControlMessage};
 use state::ProgramState;
@@ -47,7 +47,7 @@ enum TuiMessage {
 	Status(BoardId, bool),
 
 	/// Data TuiMessage (this board recieved data)
-	Data(BoardId)
+	Data(BoardId, Instant)
 }
 
 

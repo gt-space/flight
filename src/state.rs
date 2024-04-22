@@ -89,7 +89,7 @@ impl fmt::Display for ProgramState {
 
 fn init() -> ProgramState {
 	let home_socket = UdpSocket::bind(SWITCHBOARD_ADDRESS)
-		.expect(&format!("Cannot create bind on address {:#?}", SWITCHBOARD_ADDRESS));
+		 .expect(&format!("Cannot create bind on address {:#?}", SWITCHBOARD_ADDRESS));
 
 	let shared = SharedState {
 		vehicle_state: Arc::new(Mutex::new(VehicleState::new())),
@@ -113,7 +113,7 @@ fn init() -> ProgramState {
 	sequence::set_device_handler(create_device_handler(shared.clone(), command_tx));
 	thread::spawn(check_triggers(&shared));
 	let shared_clone = shared.clone(); 
-	thread::spawn(move || display(&shared_clone));
+	thread::spawn(move || display(&shared_clone, tui_rx));
 
 	ProgramState::ServerDiscovery { shared }
 }

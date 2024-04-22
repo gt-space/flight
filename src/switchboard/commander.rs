@@ -13,7 +13,7 @@ pub fn commander(shared: SharedState, commands: Receiver<(BoardId, SamControlMes
       let message = match postcard::to_slice(&command, &mut buffer) {
         Ok(package) =>  package,
         Err(e) => {
-          fail!("postcard returned this error when attempting to serialize control message {command:#?} Aborting..: {e}");
+         // fail!("postcard returned this error when attempting to serialize control message {command:#?} Aborting..: {e}");
           handler::abort(&shared);
           return;
         }
@@ -27,21 +27,21 @@ pub fn commander(shared: SharedState, commands: Receiver<(BoardId, SamControlMes
           Ok(_) => {
             match command {
               SamControlMessage::ActuateValve { channel, powered } => {
-                pass!("The command was sent successfully: {} {board_id}'s channel {channel} valve.", if powered { "Power" } else { "Unpower" });
+               // pass!("The command was sent successfully: {} {board_id}'s channel {channel} valve.", if powered { "Power" } else { "Unpower" });
               },
               SamControlMessage::SetLed { channel, on } => {
-                pass!("The command was sent successfully: Turn {} {board_id}'s channel {channel} LED.", if on { "on" } else { "off" });
+             //   pass!("The command was sent successfully: Turn {} {board_id}'s channel {channel} LED.", if on { "on" } else { "off" });
               },
             }
           },
           Err(e) => fail!("Couldn't send control message to board {board_id} via socket {socket:#?}: {e}"),
         };
       } else {
-        fail!("Couldn't find socket with board ID {board_id} in sockets HashMap.");
+        //fail!("Couldn't find socket with board ID {board_id} in sockets HashMap.");
       }
     }
 
-    fail!("The FC unexpectedly dropped the command channel. Aborting and committing suicide...");
+    //fail!("The FC unexpectedly dropped the command channel. Aborting and committing suicide...");
     handler::abort(&shared);
   }
 }

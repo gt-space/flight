@@ -11,7 +11,7 @@ pub fn defibrillator(shared: SharedState, sender: UdpSocket, sockets: Arc<RwLock
     let heartbeat = match postcard::to_slice(&DataMessage::FlightHeartbeat, &mut buf) {
       Ok(package) => package,
       Err(e) => {
-        fail!("postcard returned this error when attempting to serialize DataMessage::FlightHeartbeat: {e}");
+        //fail!("postcard returned this error when attempting to serialize DataMessage::FlightHeartbeat: {e}");
         handler::abort(&shared);
         return;
       }
@@ -29,13 +29,13 @@ pub fn defibrillator(shared: SharedState, sender: UdpSocket, sockets: Arc<RwLock
         }
 
         if let Err(e) = sender.send_to(heartbeat, address) {
-          fail!("Couldn't send heartbeat to address {address:#?}: {e}");
+          //fail!("Couldn't send heartbeat to address {address:#?}: {e}");
           abort = true;
         }
       }
 
       if abort {
-        fail!("Aborting...");
+        //fail!("Aborting...");
         handler::abort(&shared);
       }
     }

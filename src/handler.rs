@@ -91,7 +91,7 @@ fn actuate_valve(name: &str, state: ValveState, mappings: &Mutex<Vec<NodeMapping
 	let message = SamControlMessage::ActuateValve { channel: mapping.channel, powered };
 
 	if let Err(error) = command_tx.send((mapping.board_id.clone(), message)) {
-		fail!("Failed to send command: {error}");
+		//fail!("Failed to send command: {error}");
 	}
 
 	drop(mappings);

@@ -45,18 +45,18 @@ pub fn lifetime(shared: SharedState, snooze: Receiver<BoardId>, statuses: Arc<Mu
           //  fail!("Couldn't send message to TUI. tui_rx might've been dropped: {e}");
           //};
 
-          fail!("Detected loss of comms from {board_id}");
+         // fail!("Detected loss of comms from {board_id}");
         }
       }
 
       drop(statuses);
       if abort {
-        fail!("Aborting...");
+       // fail!("Aborting...");
         handler::abort(&shared);
       }
     }
 
-    fail!("Switchboard unexpectedly dropped the snooze channel. Aborting and committing suicide...");
+    //fail!("Switchboard unexpectedly dropped the snooze channel. Aborting and committing suicide...");
     handler::abort(&shared);
   }
 }

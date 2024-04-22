@@ -3,6 +3,8 @@ mod worker;
 mod lifetime;
 mod defibrillator;
 mod commander;
+//TESTING ONLY
+mod tuitester;
 
 use switchboard::switchboard;
 use lifetime::lifetime;
@@ -11,6 +13,8 @@ use defibrillator::defibrillator;
 use commander::commander;
 use std::{collections::{HashMap, HashSet}, io, net::UdpSocket, sync::{mpsc, Arc, Mutex, RwLock}, thread};
 use crate::{state::SharedState, CommandSender, TuiReceiver};
+//TESTING ONLY 
+use tuitester::tuitester;
 
 // Concerns: might be a bit too abort happy?
 
@@ -33,6 +37,9 @@ pub fn start(shared: SharedState, socket: UdpSocket) -> io::Result<(CommandSende
   thread::spawn(defibrillator(shared.clone(), sender, sockets.clone(), statuses.clone()));
   thread::spawn(worker(shared.clone(), gig_rx));
   thread::spawn(commander(shared.clone(), command_rx, command_sender, sockets.clone()));
+
+  //TESTTING ONLY 
+  thread::spawn(move || tuitester(tui_tx.clone()));
 
   Ok((command_tx, tui_rx))
 }
