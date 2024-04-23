@@ -6,15 +6,10 @@ use common::comm::Measurement;
 use common::comm::NodeMapping;
 use crossterm::{terminal::EnterAlternateScreen, ExecutableCommand};
 use crossterm::style::Stylize;
-
-
-
 use sysinfo::{Networks, System};
 use hostname;
 use ratatui::{prelude::*, widgets::*};
 use crate::{state::SharedState, TuiMessage, TuiReceiver};
-
-
 
 
 #[derive(Clone)]
@@ -27,10 +22,12 @@ struct BoardStatus {
 
 
 pub fn display(shared: &SharedState, tui_rx: TuiReceiver)-> io::Result<()> {
-    let mut network_data: (Option<u64>, Option<u64>, Option<Instant>) = (None, None, None);
     stdout().execute(EnterAlternateScreen)?;
     let mut terminal = Terminal::new(CrosstermBackend::new(stdout()))?;
     let mut board_status_map: HashMap<String, BoardStatus> = HashMap::new();
+    let mut networks = Networks::new_with_refreshed_list();
+    let mut network_data: (Option<u64>, Option<u64>, Option<Instant>, Networks) = (None, None, None, networks);
+
     loop { 
         let vehicle_state = shared.vehicle_state.lock().unwrap();
         let sensor_data: HashMap<String, Measurement> = vehicle_state.sensor_readings.clone();
@@ -41,20 +38,16 @@ pub fn display(shared: &SharedState, tui_rx: TuiReceiver)-> io::Result<()> {
         let mappings = shared.mappings.lock().unwrap();
         let all_mappings :Vec<NodeMapping> = mappings.clone();
         drop(mappings);
-        network_data = network_averager(network_data.0, network_data.1,network_data.2);
+        network_data = network_averager(network_data.3, network_data.0, network_data.1, network_data.2);
         board_status_map = sam_board_connections(board_status_map, all_mappings, &tui_rx);
         terminal.draw(|mut frame| ui(&mut frame, sensor_data, server, network_data.0, network_data.1, board_status_map.clone()))?;
 		thread::sleep(Duration::from_millis(100));
     } 
 } 
 
-
-
-
-
 fn ui(frame: &mut Frame, sensor_data: HashMap<String, Measurement>, server: Option<IpAddr>, received: Option<u64>, transmitted: Option<u64>, board_status_map: HashMap<String, BoardStatus>) {
     let num_measurements = sensor_data.len();
-    let mut sensor_info = format!("Number of Measurements: {}\n\n", num_measurements);
+    let mut sensor_info = format!("");
     for (sensor_name, measurement) in sensor_data {
         sensor_info.push_str(&format!("{}: {:?} {:?}\n", sensor_name, measurement.value, measurement.unit));
     }
@@ -74,10 +67,6 @@ fn ui(frame: &mut Frame, sensor_data: HashMap<String, Measurement>, server: Opti
 
     let hostname = hostname::get().unwrap_or_default().to_string_lossy().to_string();
 
-    // Current implementation prints total data received and transmitted from all interfaces 
-    //prinint out current ammount / data transmitted since last iteration kept returning zero. 
-    
-
     let received_string = received.map(|val| val.to_string()).unwrap_or_else(|| "Could not be calculated".to_string());
     let transmitted_string = transmitted.map(|val| val.to_string()).unwrap_or_else(|| "Could not be calculated".to_string());
 
@@ -95,14 +84,15 @@ fn ui(frame: &mut Frame, sensor_data: HashMap<String, Measurement>, server: Opti
 
     let mut sam_box_content = String::new();
 
-    sam_box_content += "Board ID  | Mapped  | Connected | Freq \n";
-    sam_box_content += "----------|---------|-----------|---------\n";
+    sam_box_content += "Board ID  | Mapped  | Connected | Time Passed |  Freq \n";
+    sam_box_content += "----------|---------|-----------|-------------|--------\n";
 
     for (board_id, status) in &board_status_map {
         let mapped_symbol = if status.mapped { "✓" } else { "x" }; 
         let connected_symbol = if status.connected { "✓" } else { "✕" }; 
-        let frequency = status.frequency.map_or("N/A".to_string(), |freq| freq.to_string());
-        sam_box_content += &format!("{:>8}  | {}       | {}         |{} Hz\n", board_id, mapped_symbol, connected_symbol, frequency);
+        let frequency = status.frequency.map_or("0".to_string(), |freq| format!("{:.4}", freq));
+        let last_message = if let Some(prev_com) = status.prev_com {format!("{:.4}", Instant::now().duration_since(prev_com).as_secs_f64())} else {format!("{:width$}","N/A", width = 6)};
+        sam_box_content += &format!("{:>8}  | {}       | {}         | {}s     |{} Hz\n", board_id, mapped_symbol, connected_symbol, last_message, frequency);
     }
 
 
@@ -132,8 +122,7 @@ fn ui(frame: &mut Frame, sensor_data: HashMap<String, Measurement>, server: Opti
  
 }
 
-fn network_averager(prev_received: Option<u64>, prev_transmitted: Option<u64>, prev_time: Option<Instant>) -> (Option<u64>, Option<u64>, Option<Instant>) {
-    let mut networks = Networks::new_with_refreshed_list();
+fn network_averager(mut networks: Networks, prev_received: Option<u64>, prev_transmitted: Option<u64>, prev_time: Option<Instant>) -> (Option<u64>, Option<u64>, Option<Instant>, Networks) {
     let mut received: u64 = 0;
     let mut transmitted: u64 = 0;
 
@@ -186,12 +175,14 @@ fn network_averager(prev_received: Option<u64>, prev_transmitted: Option<u64>, p
     networks.refresh();
     let last_refresh_time = Some(Instant::now());
 
-
-
-    (received_average, transmitted_average, last_refresh_time) 
+    (received_average, transmitted_average, last_refresh_time, networks) 
 
 }
 
+/*
+Iterates through each sam board it knows about and checks if they have been any updates to its mapped status and connected status
+It also updates the last time data was received from each sam board and keeps track of frequency of updates
+*/
 fn sam_board_connections(mut board_status_map: HashMap<String, BoardStatus>, mappings: Vec<NodeMapping>, tui_rx: &TuiReceiver) -> HashMap<String, BoardStatus> {
     for mapping in mappings {
         let status_option = board_status_map.get_mut(&mapping.board_id);
@@ -202,44 +193,54 @@ fn sam_board_connections(mut board_status_map: HashMap<String, BoardStatus>, map
         }
     }
 
-    while let Ok(message) = tui_rx.try_recv() {
-        match message {
-            TuiMessage::Identity(board_id) => {
-                let status_option = board_status_map.get_mut(&board_id);
-                    if let Some(status) = status_option {
-                        status.connected = true;
-                    } else {
-                        board_status_map.insert(board_id, BoardStatus { mapped: false, connected: true, prev_com: None, frequency: None });
-                    }
-            }
-            TuiMessage::Status(board_id, is_connected) => {
-                let status_option = board_status_map.get_mut(&board_id);
-                    if let Some(status) = status_option {
-                        status.connected = is_connected;
-                    } else {
-                        board_status_map.insert(board_id, BoardStatus { mapped: false, connected: is_connected, prev_com: None, frequency:None });
-                    }
-            }
-            TuiMessage::Data(board_id, instant) => {
-                let mut status_option = board_status_map.get_mut(&board_id);
-                    if let Some(status) = status_option {
-                        if let Some(prev_com) = status.prev_com {
-                            let time_passed = instant.duration_since(prev_com);
-                            let current_frequency = 1.0 / time_passed.as_secs_f64();
-                            if let Some(frequency) = status.frequency {
-                               status.frequency = Some((frequency * 0.98) + (current_frequency * 0.02));
-                               status.prev_com = Some(instant)
-                            } else {
-                                status.frequency = Some(current_frequency);
+    let start_reading: Instant = Instant::now();
+
+    // Artificial Timeout used to ensure that TUI renders even when an influx of data is being sent (data being sent cont. without breaks), but it is not lagged behind if we were to only look at one message ever 100ms
+    while Instant::now().duration_since(start_reading).as_secs_f64() < 0.1  {
+        if let Ok(message) = tui_rx.try_recv()   {
+            match message {
+                TuiMessage::Identity(board_id) => {
+                    let status_option = board_status_map.get_mut(&board_id);
+                        if let Some(status) = status_option {
+                            status.connected = true;
+                        } else {
+                            board_status_map.insert(board_id, BoardStatus { mapped: false, connected: true, prev_com: None, frequency: None });
+                        }
+                }
+                TuiMessage::Status(board_id, is_connected) => {
+                    let status_option = board_status_map.get_mut(&board_id);
+                        if let Some(status) = status_option {
+                            status.connected = is_connected;
+                        } else {
+                            board_status_map.insert(board_id, BoardStatus { mapped: false, connected: is_connected, prev_com: None, frequency:None });
+                        }
+                }
+                //Frequency is only updated when a Data message is sent. If board stops sending data, frequency will not change, and will dispaly previous frequency. 
+                //May want to change this in the future. 
+                TuiMessage::Data(board_id, instant) => {
+                    let status_option = board_status_map.get_mut(&board_id);
+                        if let Some(status) = status_option {
+                            if let Some(prev_com) = status.prev_com {
+                                let time_passed = instant.duration_since(prev_com);
+                                let current_frequency = 1.0 / time_passed.as_secs_f64();
+                                if let Some(frequency) = status.frequency {
+                                //Higher weight given to new frequency to see major changes quicker. Need to revisit later. 
+                                status.frequency = Some((frequency * 0.8) + (current_frequency * 0.2));
                                 status.prev_com = Some(instant)
+                                } else {
+                                    status.frequency = Some(current_frequency);
+                                    status.prev_com = Some(instant)
+                                }
+                            } else {
+                                status.prev_com = Some(instant); 
                             }
                         } else {
-                            status.prev_com = Some(instant); 
+                            board_status_map.insert(board_id, BoardStatus { mapped: false, connected: true, prev_com: Some(instant), frequency: None });
                         }
-                    } else {
-                        board_status_map.insert(board_id, BoardStatus { mapped: false, connected: true, prev_com: Some(instant), frequency: None });
-                    }
+                }
             }
+        } else {
+            break;  //exit the 100ms while loop if no more data
         }
     }
     return board_status_map;
