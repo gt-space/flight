@@ -5,7 +5,6 @@ use std::ops::Div;
 use common::comm::Measurement;
 use common::comm::NodeMapping;
 use crossterm::{terminal::EnterAlternateScreen, ExecutableCommand};
-use crossterm::style::Stylize;
 use sysinfo::{Networks, System};
 use hostname;
 use ratatui::{prelude::*, widgets::*};
