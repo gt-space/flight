@@ -287,6 +287,7 @@ fn run_sequence(server_socket: TcpStream, sequence: Sequence, shared: SharedStat
 /// running the corresponding script inline if so.
 fn check_triggers(shared: &SharedState) -> impl FnOnce() -> () {
 	let triggers = shared.triggers.clone();
+	let sequences = shared.sequences.clone();
 
 	// return closure instead of using the function itself because of borrow-checking
 	// rules regarding moving the 'triggers' reference across closure bounds
@@ -295,6 +296,12 @@ fn check_triggers(shared: &SharedState) -> impl FnOnce() -> () {
 			let mut triggers = triggers.lock().unwrap();
 
 			for trigger in triggers.iter_mut() {
+				// like putting duct tape on apollo 11
+				// TODO fix this asap with a less demanding solution
+				let mut sequences = sequences.lock().unwrap();
+				sequences.insert(String::new(), thread::current().id());
+				drop(sequences);
+
 				// perform check by running condition as Python script and getting truth value
 				let check = Python::with_gil(|py| {
 					py.eval(&trigger.condition, None, None)
