@@ -25,7 +25,7 @@ pub fn display(shared: &SharedState, tui_rx: TuiReceiver)-> io::Result<()> {
     let mut terminal = Terminal::new(CrosstermBackend::new(stdout()))?;
     let mut board_status_map: HashMap<String, BoardStatus> = HashMap::new();
     let mut networks = Networks::new_with_refreshed_list();
-    let mut network_data: (Option<u64>, Option<u64>, Option<Instant>, Networks) = (None, None, None, networks);
+    let mut network_data: (Option<u64>, Option<u64>, Instant, Networks) = (None, None, Instant::now(), networks);
 
     loop { 
         let vehicle_state = shared.vehicle_state.lock().unwrap();
@@ -121,7 +121,7 @@ fn ui(frame: &mut Frame, sensor_data: HashMap<String, Measurement>, server: Opti
  
 }
 
-fn network_averager(mut networks: Networks, prev_received: Option<u64>, prev_transmitted: Option<u64>, prev_time: Option<Instant>) -> (Option<u64>, Option<u64>, Option<Instant>, Networks) {
+fn network_averager(mut networks: Networks, prev_received: Option<u64>, prev_transmitted: Option<u64>, prev_time: Instant) -> (Option<u64>, Option<u64>, Instant, Networks) {
     let mut received: u64 = 0;
     let mut transmitted: u64 = 0;
 
@@ -131,12 +131,10 @@ fn network_averager(mut networks: Networks, prev_received: Option<u64>, prev_tra
     }
 
     let time_now = Instant::now();
-    let time_passed: Option<Duration> =  match prev_time {
-        Some(prev_time) => Some(time_now.duration_since(prev_time)),
-        _ => None, 
-        };
-    let received_average: Option<u64> = match (prev_received, time_passed) {
-        (Some(prev_received), Some(time_passed)) => {
+    let time_passed = time_now.duration_since(prev_time);
+  
+    let received_average: Option<u64> = match (prev_received) {
+        Some(prev_received) => {
             let prev_received_float = prev_received as f64;
             let received_float = received as f64;
             let time_passed_float = time_passed.as_secs_f64();
@@ -144,17 +142,15 @@ fn network_averager(mut networks: Networks, prev_received: Option<u64>, prev_tra
             Some(average_float.ceil() as u64)
         }        
         _ => {
-            let time_now2 = Instant::now();
-            let time_passed2 = time_now2.duration_since(time_now);
-            let time_passed_float = time_passed2.as_secs_f64();
+            let time_passed_float = time_passed.as_secs_f64();
             let received_float = received as f64;
             let average_float = received_float / time_passed_float;
             Some(average_float.ceil() as u64)
         }
     };
 
-    let transmitted_average: Option<u64> = match (prev_transmitted, time_passed) {
-        (Some(prev_transmitted), Some(time_passed)) => {
+    let transmitted_average: Option<u64> = match (prev_transmitted) {
+        Some(prev_transmitted) => {
             let prev_transmitted_float = prev_transmitted as f64;
             let transmitted_float = transmitted as f64;
             let time_passed_float = time_passed.as_secs_f64();
@@ -162,9 +158,7 @@ fn network_averager(mut networks: Networks, prev_received: Option<u64>, prev_tra
             Some(average_float.ceil() as u64)
         }        
         _ => {
-            let time_now2 = Instant::now();
-            let time_passed2 = time_now2.duration_since(time_now);
-            let time_passed_float = time_passed2.as_secs_f64();
+            let time_passed_float = time_passed.as_secs_f64();
             let transmitted_float = transmitted as f64;
             let average_float = transmitted_float / time_passed_float;
             Some(average_float.ceil() as u64)
@@ -172,7 +166,7 @@ fn network_averager(mut networks: Networks, prev_received: Option<u64>, prev_tra
     };
 
     networks.refresh();
-    let last_refresh_time = Some(Instant::now());
+    let last_refresh_time = Instant::now();
 
     (received_average, transmitted_average, last_refresh_time, networks) 
 
