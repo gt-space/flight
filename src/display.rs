@@ -1,4 +1,4 @@
-use std::{net::IpAddr, thread, time::{Duration,Instant}};
+use std::{collections::HashSet, net::IpAddr, thread, time::{Duration,Instant}};
 use std::io::{self, stdout};
 use std::collections::HashMap;
 use std::ops::Div;
@@ -24,7 +24,8 @@ pub fn display(shared: &SharedState, tui_rx: TuiReceiver)-> io::Result<()> {
     stdout().execute(EnterAlternateScreen)?;
     let mut terminal = Terminal::new(CrosstermBackend::new(stdout()))?;
     let mut board_status_map: HashMap<String, BoardStatus> = HashMap::new();
-    let mut networks = Networks::new_with_refreshed_list();
+    let mut loss_of_comms: HashSet<String> = HashSet::new();
+    let networks = Networks::new_with_refreshed_list();
     let mut network_data: (Option<u64>, Option<u64>, Instant, Networks) = (None, None, Instant::now(), networks);
 
     loop { 
@@ -38,14 +39,15 @@ pub fn display(shared: &SharedState, tui_rx: TuiReceiver)-> io::Result<()> {
         let all_mappings :Vec<NodeMapping> = mappings.clone();
         drop(mappings);
         network_data = network_averager(network_data.3, network_data.0, network_data.1, network_data.2);
-        board_status_map = sam_board_connections(board_status_map, all_mappings, &tui_rx);
-        terminal.draw(|mut frame| ui(&mut frame, sensor_data, server, network_data.0, network_data.1, board_status_map.clone()))?;
+        let vals: (HashMap<String, BoardStatus>, HashSet<String>) = sam_board_connections(board_status_map, all_mappings, &tui_rx, loss_of_comms);
+        board_status_map = vals.0;
+        loss_of_comms = vals.1;
+        terminal.draw(|mut frame| ui(&mut frame, sensor_data, server, network_data.0, network_data.1, board_status_map.clone(), loss_of_comms.clone()))?;
 		thread::sleep(Duration::from_millis(100));
     } 
 } 
 
-fn ui(frame: &mut Frame, sensor_data: HashMap<String, Measurement>, server: Option<IpAddr>, received: Option<u64>, transmitted: Option<u64>, board_status_map: HashMap<String, BoardStatus>) {
-    let num_measurements = sensor_data.len();
+fn ui(frame: &mut Frame, sensor_data: HashMap<String, Measurement>, server: Option<IpAddr>, received: Option<u64>, transmitted: Option<u64>, board_status_map: HashMap<String, BoardStatus>, loss_of_comms: HashSet<String>) {
     let mut sensor_info = format!("");
     for (sensor_name, measurement) in sensor_data {
         sensor_info.push_str(&format!("{}: {:?} {:?}\n", sensor_name, measurement.value, measurement.unit));
@@ -94,9 +96,17 @@ fn ui(frame: &mut Frame, sensor_data: HashMap<String, Measurement>, server: Opti
         sam_box_content += &format!("{:>8}  | {}       | {}         | {}s     |{} Hz\n", board_id, mapped_symbol, connected_symbol, last_message, frequency);
     }
 
+    let mut loss_of_comms_content = String::new();
+    for board_id in loss_of_comms {
+        loss_of_comms_content += &format!("{} \n", board_id);
+    }
+
 
     let sam_box = Paragraph::new(sam_box_content)
         .block(Block::default().title("Boards").borders(Borders::ALL));
+
+    let loss_of_comms_box = Paragraph::new(loss_of_comms_content)
+        .block(Block::default().title("Loss Of Communication").borders(Borders::ALL));
 
     let chunks = Layout::default()
     .direction(Direction::Horizontal)
@@ -110,7 +120,7 @@ fn ui(frame: &mut Frame, sensor_data: HashMap<String, Measurement>, server: Opti
 
     let sensor_and_sam_chunk =  Layout::default()
     .direction(Direction::Vertical)
-    .constraints([Constraint::Percentage(50), Constraint::Percentage(50)].as_ref())
+    .constraints([Constraint::Percentage(33), Constraint::Percentage(33), Constraint::Percentage(33)].as_ref())
     .split(chunks[1]);
 
     frame.render_widget(system_box, system_and_server_chunk[0]);
@@ -118,6 +128,7 @@ fn ui(frame: &mut Frame, sensor_data: HashMap<String, Measurement>, server: Opti
     frame.render_widget(network_box, system_and_server_chunk[1]);
     frame.render_widget(sensor_box, sensor_and_sam_chunk[0]); 
     frame.render_widget(sam_box, sensor_and_sam_chunk[1]); 
+    frame.render_widget(loss_of_comms_box, sensor_and_sam_chunk[2]); 
  
 }
 
@@ -133,7 +144,7 @@ fn network_averager(mut networks: Networks, prev_received: Option<u64>, prev_tra
     let time_now = Instant::now();
     let time_passed = time_now.duration_since(prev_time);
   
-    let received_average: Option<u64> = match (prev_received) {
+    let received_average: Option<u64> = match prev_received {
         Some(prev_received) => {
             let prev_received_float = prev_received as f64;
             let received_float = received as f64;
@@ -149,7 +160,7 @@ fn network_averager(mut networks: Networks, prev_received: Option<u64>, prev_tra
         }
     };
 
-    let transmitted_average: Option<u64> = match (prev_transmitted) {
+    let transmitted_average: Option<u64> = match prev_transmitted {
         Some(prev_transmitted) => {
             let prev_transmitted_float = prev_transmitted as f64;
             let transmitted_float = transmitted as f64;
@@ -176,7 +187,7 @@ fn network_averager(mut networks: Networks, prev_received: Option<u64>, prev_tra
 Iterates through each sam board it knows about and checks if they have been any updates to its mapped status and connected status
 It also updates the last time data was received from each sam board and keeps track of frequency of updates
 */
-fn sam_board_connections(mut board_status_map: HashMap<String, BoardStatus>, mappings: Vec<NodeMapping>, tui_rx: &TuiReceiver) -> HashMap<String, BoardStatus> {
+fn sam_board_connections(mut board_status_map: HashMap<String, BoardStatus>, mappings: Vec<NodeMapping>, tui_rx: &TuiReceiver, mut loss_of_comms: HashSet<String>) -> (HashMap<String, BoardStatus>, HashSet<String>) {
     for mapping in mappings {
         let status_option = board_status_map.get_mut(&mapping.board_id);
         if let Some(status) = status_option {
@@ -231,11 +242,18 @@ fn sam_board_connections(mut board_status_map: HashMap<String, BoardStatus>, map
                             board_status_map.insert(board_id, BoardStatus { mapped: false, connected: true, prev_com: Some(instant), frequency: None });
                         }
                 }
+                TuiMessage::Loc(board_id, still_communicating) => {
+                    if still_communicating {
+                        loss_of_comms.remove(&board_id);
+                    } else {
+                        loss_of_comms.insert(board_id);
+                    }
+                }
             }
         } else {
             break;  //exit the 100ms while loop if no more data
         }
     }
-    return board_status_map;
+    return (board_status_map, loss_of_comms);
 }
 

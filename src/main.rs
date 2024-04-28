@@ -43,11 +43,14 @@ enum TuiMessage {
 	/// When a new board is found
 	Identity(BoardId),
 
-	/// Loss of Communications TuiMessage, if the boolean is true then the board is not disconnected, and vice versa.
+	/// Loss of Connections TuiMessage, if the boolean is true then the board is not disconnected, and vice versa.
 	Status(BoardId, bool),
 
 	/// Data TuiMessage (this board recieved data)
-	Data(BoardId, Instant)
+	Data(BoardId, Instant),
+
+	// Loss of Communications TuiMessage, if the boolean is false then the switchboard has detected a loss of coms for that board
+	Loc(BoardId, bool)
 }
 
 
